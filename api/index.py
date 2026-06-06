@@ -31,8 +31,8 @@ def init_db():
     conn = psycopg2.connect(get_db_url())
     conn.autocommit = True
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at REAL NOT NULL)')
-    c.execute('CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), content TEXT NOT NULL, created_at REAL NOT NULL, is_processed BOOLEAN NOT NULL DEFAULT FALSE)')
+    c.execute('CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), content TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, is_processed BOOLEAN NOT NULL DEFAULT FALSE)')
     c.execute('CREATE TABLE IF NOT EXISTS tags (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS message_tags (message_id INTEGER NOT NULL REFERENCES messages(id), tag_id INTEGER NOT NULL REFERENCES tags(id), PRIMARY KEY (message_id, tag_id))')
     conn.close()
@@ -205,9 +205,9 @@ async def list_messages(page: int = 1, page_size: int = 10, tag: Optional[str] =
     page = max(1, min(page, total_pages))
     offset = (page - 1) * page_size
     if tag:
-        c.execute('SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s', (user_id, tag, page_size, offset))
+        c.execute('SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, tag, page_size, offset))
     else:
-        c.execute('SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s', (user_id, page_size, offset))
+        c.execute('SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, page_size, offset))
     rows = c.fetchall()
     items = []
     for r in rows:

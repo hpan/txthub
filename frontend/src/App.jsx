@@ -99,6 +99,24 @@ const TAG_COLORS = {
 }
 const DEFAULT_TAG_COLOR = { bg: 'bg-gray-100', text: 'text-gray-600', active: 'bg-gray-500 text-white' }
 
+
+function LinkifyText({ text }) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = text.split(urlRegex)
+  return (
+    <>
+      {parts.map((part, i) =>
+        urlRegex.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+            className="text-blue-500 hover:underline break-all">{part}</a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
+
 function TagBadge({ name, small = false }) {
   const c = TAG_COLORS[name] || DEFAULT_TAG_COLOR
   return (
@@ -225,7 +243,7 @@ function App() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2 min-w-0">
                   <span className="text-xs text-gray-400 font-mono shrink-0 pt-0.5">#{msg.id}</span>
-                  <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}>{msg.content}</span>
+                  <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}><LinkifyText text={msg.content} /></span>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={() => copyToClipboard(msg.content, msg.id)}

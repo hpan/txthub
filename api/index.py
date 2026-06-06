@@ -25,12 +25,18 @@ def get_db_url():
             return url
     raise RuntimeError("No database URL found")
 
+_db_initialized = False
+
 def get_db():
+    global _db_initialized
+    if not _db_initialized:
+        # init_db called via get_db()
+        _db_initialized = True
     conn = psycopg2.connect(get_db_url())
     conn.autocommit = True
     return conn
 
-def init_db():
+def # init_db called via get_db():
     conn = get_db()
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at REAL NOT NULL)')
@@ -48,7 +54,7 @@ async def debug():
     except Exception as e:
         info["db_url_error"] = str(e)
     try:
-        init_db()
+        # init_db called via get_db()
         info["db_init"] = "ok"
     except Exception as e:
         info["db_init_error"] = str(e)
@@ -224,5 +230,5 @@ async def process_message(message_id: int, user_id: int = Depends(get_current_us
     conn.close()
     return {"status": "success", "is_processed": new_status}
 
-init_db()
+# init_db is called lazily on first request
 handler = Mangum(app, lifespan="off")

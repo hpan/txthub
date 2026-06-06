@@ -284,8 +284,15 @@ function App() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => copyToClipboard(msg.content, msg.id)}
-                    className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">
-                    {copiedId === msg.id ? '✓' : '复制'}
+                    title="复制"
+                    className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                      ${copiedId === msg.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}>
+                    {copiedId === msg.id ? '✓' : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    )}
                   </button>
                   <button onClick={() => toggleProcess(msg.id)}
                     title={msg.is_processed ? '已处理' : '标为已处理'}

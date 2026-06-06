@@ -1,8 +1,12 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rootDirectory": "frontend",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" }
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" },
+    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "dist", "root": "frontend" } }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "handle": "filesystem" },
+    { "src": "/(.*\\.(js|css|svg|png|ico|woff|woff2|ttf|eot))", "dest": "/frontend/dist/$1" },
+    { "src": "/(.*)", "dest": "/frontend/dist/index.html" }
   ]
 }

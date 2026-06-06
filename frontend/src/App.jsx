@@ -41,7 +41,7 @@ function AuthPage({ onLogin }) {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-6">TxtHub</h1>
+        <h1 className="text-2xl font-bold text-center mb-6">文枢</h1>
         <div className="flex mb-6 border-b">
           <button onClick={() => { setMode('login'); setError('') }}
             className={`flex-1 pb-2 text-sm font-medium ${mode === 'login' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-400'}`}>登录</button>
@@ -196,7 +196,7 @@ function App() {
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">TxtHub</h1>
+          <h1 className="text-3xl font-bold">文枢</h1>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">{username}</span>
             <button onClick={logout} className="text-sm text-gray-400 hover:text-gray-600">退出</button>

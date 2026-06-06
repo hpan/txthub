@@ -16,6 +16,8 @@ ALGORITHM = "HS256"
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+_db_initialized = False
+
 def get_db_url():
     for key in ["DATABASE_URL", "POSTGRES_URL", "POSTGRES_PRISMA_URL", "POSTGRES_URL_NON_POOLING"]:
         url = os.environ.get(key)
@@ -25,19 +27,9 @@ def get_db_url():
             return url
     raise RuntimeError("No database URL found")
 
-_db_initialized = False
-
-def get_db():
-    global _db_initialized
-    if not _db_initialized:
-        # init_db called via get_db()
-        _db_initialized = True
+def init_db():
     conn = psycopg2.connect(get_db_url())
     conn.autocommit = True
-    return conn
-
-def # init_db called via get_db():
-    conn = get_db()
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at REAL NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), content TEXT NOT NULL, created_at REAL NOT NULL, is_processed BOOLEAN NOT NULL DEFAULT FALSE)')
@@ -45,37 +37,27 @@ def # init_db called via get_db():
     c.execute('CREATE TABLE IF NOT EXISTS message_tags (message_id INTEGER NOT NULL REFERENCES messages(id), tag_id INTEGER NOT NULL REFERENCES tags(id), PRIMARY KEY (message_id, tag_id))')
     conn.close()
 
-@app.get("/api/debug")
-async def debug():
-    info = {"imports": "ok"}
-    try:
-        url = get_db_url()
-        info["db_url_prefix"] = url[:30] + "..."
-    except Exception as e:
-        info["db_url_error"] = str(e)
-    try:
-        # init_db called via get_db()
-        info["db_init"] = "ok"
-    except Exception as e:
-        info["db_init_error"] = str(e)
-    return info
-
-@app.get("/api/health")
-async def health():
-    return {"status": "ok"}
+def get_db():
+    global _db_initialized
+    if not _db_initialized:
+        init_db()
+        _db_initialized = True
+    conn = psycopg2.connect(get_db_url())
+    conn.autocommit = True
+    return conn
 
 CLOUD_DRIVE_PATTERNS = [r'pan\.baidu\.com', r'quark\.cn', r'www\.alipan\.com', r'aliyundrive\.com', r'pan\.xunlei\.com', r'cloud\.189\.cn']
 
-def detect_tags(content: str) -> List[str]:
+def detect_tags(content):
     for p in CLOUD_DRIVE_PATTERNS:
         if re.search(p, content, re.IGNORECASE):
             return ["网盘"]
     return ["日记"]
 
-def hash_password(password: str) -> str:
+def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-def verify_password(password: str, hashed: str) -> bool:
+def verify_password(password, hashed):
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 def get_current_user(authorization: Optional[str] = Header(None)):
@@ -91,7 +73,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
     except JWTError:
         raise HTTPException(status_code=401, detail="无效的token")
 
-def ensure_tag(conn, name: str) -> int:
+def ensure_tag(conn, name):
     c = conn.cursor()
     c.execute("SELECT id FROM tags WHERE name = %s", (name,))
     row = c.fetchone()
@@ -99,7 +81,7 @@ def ensure_tag(conn, name: str) -> int:
     c.execute("INSERT INTO tags (name) VALUES (%s) RETURNING id", (name,))
     return c.fetchone()[0]
 
-def get_message_tags(conn, message_id: int) -> List[str]:
+def get_message_tags(conn, message_id):
     c = conn.cursor()
     c.execute('SELECT t.name FROM tags t JOIN message_tags mt ON t.id = mt.tag_id WHERE mt.message_id = %s', (message_id,))
     return [row[0] for row in c.fetchall()]
@@ -127,6 +109,25 @@ class PaginatedMessages(BaseModel):
     page_size: int
     total_pages: int
 
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+@app.get("/api/debug")
+async def debug():
+    info = {"status": "ok"}
+    try:
+        url = get_db_url()
+        info["db_url"] = url[:30] + "..."
+    except Exception as e:
+        info["db_error"] = str(e)
+    try:
+        init_db()
+        info["db_init"] = "ok"
+    except Exception as e:
+        info["db_init_error"] = str(e)
+    return info
+
 @app.post("/api/register")
 async def register(user: UserCreate):
     if len(user.username) < 2 or len(user.password) < 4:
@@ -137,9 +138,9 @@ async def register(user: UserCreate):
     if c.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="用户名已存在")
-    hash_ = hash_password(user.password)
+    h = hash_password(user.password)
     c.execute("INSERT INTO users (username, password_hash, created_at) VALUES (%s, %s, %s) RETURNING id",
-              (user.username, hash_, time.time()))
+              (user.username, h, time.time()))
     user_id = c.fetchone()[0]
     conn.close()
     token = jwt.encode({"sub": str(user_id)}, SECRET_KEY, algorithm=ALGORITHM)
@@ -170,10 +171,10 @@ async def get_me(user_id: int = Depends(get_current_user)):
 async def list_tags(user_id: int = Depends(get_current_user)):
     conn = get_db()
     c = conn.cursor()
-    c.execute('''SELECT t.name, COUNT(mt.message_id) as count FROM tags t JOIN message_tags mt ON t.id = mt.tag_id JOIN messages m ON mt.message_id = m.id WHERE m.user_id = %s GROUP BY t.id ORDER BY count DESC''', (user_id,))
+    c.execute('SELECT t.name, COUNT(mt.message_id) as count FROM tags t JOIN message_tags mt ON t.id = mt.tag_id JOIN messages m ON mt.message_id = m.id WHERE m.user_id = %s GROUP BY t.id ORDER BY count DESC', (user_id,))
     rows = c.fetchall()
     conn.close()
-    return [{"name": row[0], "count": row[1]} for row in rows]
+    return [{"name": r[0], "count": r[1]} for r in rows]
 
 @app.post("/api/messages", response_model=Message)
 async def create_message(msg: MessageCreate, user_id: int = Depends(get_current_user)):
@@ -204,9 +205,9 @@ async def list_messages(page: int = 1, page_size: int = 10, tag: Optional[str] =
     page = max(1, min(page, total_pages))
     offset = (page - 1) * page_size
     if tag:
-        c.execute('''SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s''', (user_id, tag, page_size, offset))
+        c.execute('SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s', (user_id, tag, page_size, offset))
     else:
-        c.execute('''SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s''', (user_id, page_size, offset))
+        c.execute('SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC LIMIT %s OFFSET %s', (user_id, page_size, offset))
     rows = c.fetchall()
     items = []
     for r in rows:
@@ -230,5 +231,4 @@ async def process_message(message_id: int, user_id: int = Depends(get_current_us
     conn.close()
     return {"status": "success", "is_processed": new_status}
 
-# init_db is called lazily on first request
 handler = Mangum(app, lifespan="off")

@@ -1,9 +1,13 @@
 import os
 import psycopg2
-import psycopg2.extras
 
 def get_db_url():
-    return os.environ.get("POSTGRES_URL") or os.environ.get("DATABASE_URL")
+    # Vercel Postgres / Neon 可能用不同的环境变量名
+    for key in ["POSTGRES_URL", "DATABASE_URL", "POSTGRES_PRISMA_URL", "POSTGRES_URL_NON_POOLING"]:
+        url = os.environ.get(key)
+        if url:
+            return url
+    raise RuntimeError("No database URL found. Set POSTGRES_URL in Vercel environment variables.")
 
 def get_db():
     conn = psycopg2.connect(get_db_url())

@@ -35,6 +35,11 @@ def init_db():
     c.execute('CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), content TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, is_processed BOOLEAN NOT NULL DEFAULT FALSE)')
     c.execute('CREATE TABLE IF NOT EXISTS tags (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS message_tags (message_id INTEGER NOT NULL REFERENCES messages(id), tag_id INTEGER NOT NULL REFERENCES tags(id), PRIMARY KEY (message_id, tag_id))')
+    # Migration: change REAL to DOUBLE PRECISION if needed
+    try:
+        c.execute('ALTER TABLE messages ALTER COLUMN created_at TYPE DOUBLE PRECISION')
+    except Exception:
+        pass  # already correct type or table doesn't exist yet
     conn.close()
 
 def get_db():

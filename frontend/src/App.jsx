@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './App.css'
 
 const PAGE_SIZE = 10
@@ -99,7 +99,6 @@ const TAG_COLORS = {
 }
 const DEFAULT_TAG_COLOR = { bg: 'bg-gray-100', text: 'text-gray-600', active: 'bg-gray-500 text-white' }
 
-
 function LinkifyText({ text }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g
   const parts = text.split(urlRegex)
@@ -123,6 +122,36 @@ function TagBadge({ name, small = false }) {
     <span className={`inline-block rounded-full ${c.bg} ${c.text} ${small ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'} font-medium`}>
       {name}
     </span>
+  )
+}
+
+function MoreMenu({ onDelete }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)}
+        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition text-lg leading-none">
+        ⋯
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 bg-white border rounded-lg shadow-lg py-1 z-10 min-w-[80px]">
+          <button onClick={() => { onDelete(); setOpen(false) }}
+            className="w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 text-left">
+            删除
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -173,6 +202,12 @@ function App() {
   const toggleProcess = async (id) => {
     await api(`/api/messages/${id}/process`, { method: 'PUT' })
     fetchMessages()
+  }
+
+  const deleteMessage = async (id) => {
+    await api(`/api/messages/${id}`, { method: 'DELETE' })
+    fetchMessages()
+    fetchTags()
   }
 
   const copyToClipboard = (text, id) => {
@@ -239,21 +274,29 @@ function App() {
 
         <div className="space-y-3">
           {messages.map(msg => (
-            <div key={msg.id} className={`p-4 rounded-lg border ${msg.is_processed ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'}`}>
+            <div key={msg.id} className={`group p-4 rounded-lg border ${msg.is_processed ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2 min-w-0">
                   <span className="text-xs text-gray-400 font-mono shrink-0 pt-0.5">#{msg.id}</span>
-                  <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}><LinkifyText text={msg.content} /></span>
+                  <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}>
+                    <LinkifyText text={msg.content} />
+                  </span>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => copyToClipboard(msg.content, msg.id)}
-                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition">
-                    {copiedId === msg.id ? '✓ 已复制' : '复制'}
+                    className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition">
+                    {copiedId === msg.id ? '✓' : '复制'}
                   </button>
                   <button onClick={() => toggleProcess(msg.id)}
-                    className={`px-3 py-1 text-sm rounded transition ${msg.is_processed ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800' : 'bg-green-100 hover:bg-green-200 text-green-800'}`}>
-                    {msg.is_processed ? '撤销' : '已处理'}
+                    title={msg.is_processed ? '已处理' : '标为已处理'}
+                    className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                      ${msg.is_processed
+                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                      }`}>
+                    {msg.is_processed ? '✓' : '○'}
                   </button>
+                  <MoreMenu onDelete={() => deleteMessage(msg.id)} />
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between">

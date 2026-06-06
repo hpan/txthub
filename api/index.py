@@ -236,4 +236,18 @@ async def process_message(message_id: int, user_id: int = Depends(get_current_us
     conn.close()
     return {"status": "success", "is_processed": new_status}
 
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(message_id: int, user_id: int = Depends(get_current_user)):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id FROM messages WHERE id = %s AND user_id = %s", (message_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="消息不存在")
+    c.execute("DELETE FROM message_tags WHERE message_id = %s", (message_id,))
+    c.execute("DELETE FROM messages WHERE id = %s AND user_id = %s", (message_id, user_id))
+    conn.close()
+    return {"status": "deleted"}
+
 handler = Mangum(app, lifespan="off")

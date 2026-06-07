@@ -40,6 +40,10 @@ def init_db():
         c.execute('ALTER TABLE messages ALTER COLUMN created_at TYPE DOUBLE PRECISION')
     except Exception:
         pass  # already correct type or table doesn't exist yet
+    try:
+        c.execute('ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_edited BOOLEAN NOT NULL DEFAULT FALSE')
+    except Exception:
+        pass
     conn.close()
 
 def get_db():
@@ -105,6 +109,7 @@ class Message(BaseModel):
     content: str
     created_at: float
     is_processed: bool
+    is_edited: bool
     tags: List[str]
 
 class PaginatedMessages(BaseModel):
@@ -195,7 +200,7 @@ async def create_message(msg: MessageCreate, user_id: int = Depends(get_current_
     c.execute("SELECT username FROM users WHERE id = %s", (user_id,))
     username = c.fetchone()[0]
     conn.close()
-    return {"id": msg_id, "user_id": user_id, "username": username, "content": msg.content, "created_at": created_at, "is_processed": False, "tags": tag_names}
+    return {"id": msg_id, "user_id": user_id, "username": username, "content": msg.content, "created_at": created_at, "is_processed": False, "is_edited": False, "tags": tag_names}
 
 @app.get("/api/messages", response_model=PaginatedMessages)
 async def list_messages(page: int = 1, page_size: int = 10, tag: Optional[str] = None, user_id: int = Depends(get_current_user)):
@@ -210,13 +215,13 @@ async def list_messages(page: int = 1, page_size: int = 10, tag: Optional[str] =
     page = max(1, min(page, total_pages))
     offset = (page - 1) * page_size
     if tag:
-        c.execute('SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, tag, page_size, offset))
+        c.execute('SELECT DISTINCT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed, m.is_edited FROM messages m JOIN users u ON m.user_id = u.id JOIN message_tags mt ON m.id = mt.message_id JOIN tags t ON mt.tag_id = t.id WHERE m.user_id = %s AND t.name = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, tag, page_size, offset))
     else:
-        c.execute('SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, page_size, offset))
+        c.execute('SELECT m.id, m.user_id, u.username, m.content, m.created_at, m.is_processed, m.is_edited FROM messages m JOIN users u ON m.user_id = u.id WHERE m.user_id = %s ORDER BY m.created_at DESC, m.id DESC LIMIT %s OFFSET %s', (user_id, page_size, offset))
     rows = c.fetchall()
     items = []
     for r in rows:
-        item = {"id": r[0], "user_id": r[1], "username": r[2], "content": r[3], "created_at": r[4], "is_processed": r[5]}
+        item = {"id": r[0], "user_id": r[1], "username": r[2], "content": r[3], "created_at": r[4], "is_processed": r[5], "is_edited": r[6] if len(r) > 6 else False}
         item["tags"] = get_message_tags(conn, item["id"])
         items.append(item)
     conn.close()
@@ -236,6 +241,28 @@ async def process_message(message_id: int, user_id: int = Depends(get_current_us
     conn.close()
     return {"status": "success", "is_processed": new_status}
 
+
+
+class MessageUpdate(BaseModel):
+    content: str
+
+@app.put("/api/messages/{message_id}")
+async def edit_message(message_id: int, msg: MessageUpdate, user_id: int = Depends(get_current_user)):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id FROM messages WHERE id = %s AND user_id = %s", (message_id, user_id))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="消息不存在")
+    c.execute("UPDATE messages SET content = %s, is_edited = TRUE WHERE id = %s", (msg.content, message_id))
+    # 重新检测标签
+    c.execute("DELETE FROM message_tags WHERE message_id = %s", (message_id,))
+    tag_names = detect_tags(msg.content)
+    for name in tag_names:
+        tag_id = ensure_tag(conn, name)
+        c.execute("INSERT INTO message_tags (message_id, tag_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (message_id, tag_id))
+    conn.close()
+    return {"status": "updated", "is_edited": True, "tags": tag_names}
 
 @app.delete("/api/messages/{message_id}")
 async def delete_message(message_id: int, user_id: int = Depends(get_current_user)):

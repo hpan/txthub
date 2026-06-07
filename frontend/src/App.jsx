@@ -125,7 +125,7 @@ function TagBadge({ name, small = false }) {
   )
 }
 
-function MoreMenu({ onDelete }) {
+function MoreMenu({ onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -145,6 +145,10 @@ function MoreMenu({ onDelete }) {
       </button>
       {open && (
         <div className="absolute right-0 top-8 bg-white border rounded-lg shadow-lg py-1 z-10 min-w-[80px]">
+          <button onClick={() => { onEdit(); setOpen(false) }}
+            className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+            编辑
+          </button>
           <button onClick={() => { onDelete(); setOpen(false) }}
             className="w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 text-left">
             删除
@@ -165,6 +169,8 @@ function App() {
   const [copiedId, setCopiedId] = useState(null)
   const [tags, setTags] = useState([])
   const [activeTag, setActiveTag] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editContent, setEditContent] = useState('')
 
   const fetchTags = useCallback(async () => {
     const res = await api('/api/tags')
@@ -208,6 +214,28 @@ function App() {
     await api(`/api/messages/${id}`, { method: 'DELETE' })
     fetchMessages()
     fetchTags()
+  }
+
+  const startEdit = (msg) => {
+    setEditingId(msg.id)
+    setEditContent(msg.content)
+  }
+
+  const saveEdit = async (id) => {
+    if (!editContent.trim()) return
+    await api(`/api/messages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content: editContent })
+    })
+    setEditingId(null)
+    setEditContent('')
+    fetchMessages()
+    fetchTags()
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditContent('')
   }
 
   const copyToClipboard = (text, id) => {
@@ -276,35 +304,53 @@ function App() {
           {messages.map(msg => (
             <div key={msg.id} className={`group p-4 rounded-lg border ${msg.is_processed ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'}`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2 min-w-0">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
                   <span className="text-xs text-gray-400 font-mono shrink-0 pt-0.5">#{msg.id}</span>
-                  <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}>
-                    <LinkifyText text={msg.content} />
-                  </span>
+                  {editingId === msg.id ? (
+                    <div className="flex-1 flex gap-2">
+                      <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
+                        className="flex-1 p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        rows={2} autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(msg.id) }; if (e.key === 'Escape') cancelEdit() }} />
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => saveEdit(msg.id)}
+                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">保存</button>
+                        <button onClick={cancelEdit}
+                          className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300">取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}>
+                      <LinkifyText text={msg.content} />
+                      {msg.is_edited && <span className="ml-1.5 text-xs text-gray-400">(已编辑)</span>}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={() => copyToClipboard(msg.content, msg.id)}
-                    title="复制"
-                    className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
-                      ${copiedId === msg.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}>
-                    {copiedId === msg.id ? '✓' : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2"/>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                      </svg>
-                    )}
-                  </button>
-                  <button onClick={() => toggleProcess(msg.id)}
-                    title={msg.is_processed ? '已处理' : '标为已处理'}
-                    className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
-                      ${msg.is_processed
-                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-                      }`}>
-                    {msg.is_processed ? '✓' : '○'}
-                  </button>
-                  <MoreMenu onDelete={() => deleteMessage(msg.id)} />
-                </div>
+                {editingId !== msg.id && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => copyToClipboard(msg.content, msg.id)}
+                      title="复制"
+                      className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                        ${copiedId === msg.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}>
+                      {copiedId === msg.id ? '✓' : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                      )}
+                    </button>
+                    <button onClick={() => toggleProcess(msg.id)}
+                      title={msg.is_processed ? '已处理' : '标为已处理'}
+                      className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                        ${msg.is_processed
+                          ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                        }`}>
+                      {msg.is_processed ? '✓' : '○'}
+                    </button>
+                    <MoreMenu onEdit={() => startEdit(msg)} onDelete={() => deleteMessage(msg.id)} />
+                  </div>
+                )}
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <div className="flex gap-1.5">

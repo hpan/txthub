@@ -121,7 +121,7 @@ function MessageContent({ msg }) {
   const isCode = msg.tags && msg.tags.includes('代码')
   if (isCode) {
     return (
-      <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed whitespace-pre-wrap break-all">
+      <pre className="bg-gray-50 text-gray-700 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed whitespace-pre-wrap break-all">
         <code>{msg.content}</code>
       </pre>
     )

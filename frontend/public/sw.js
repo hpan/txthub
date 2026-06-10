@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wenshu-v1'
+const CACHE_NAME = 'wenshu-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

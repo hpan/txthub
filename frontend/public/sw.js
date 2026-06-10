@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wenshu-v2'
+const CACHE_NAME = 'wenshu-v3'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -31,7 +31,20 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(request))
     return
   }
-  // 静态资源用 cache-first 策略
+  // JS/CSS 用 network-first 策略，确保更新及时生效
+  if (request.destination === 'script' || request.destination === 'style') {
+    event.respondWith(
+      fetch(request).then((response) => {
+        if (response.ok) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+        }
+        return response
+      }).catch(() => caches.match(request))
+    )
+    return
+  }
+  // 其他静态资源用 cache-first 策略
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached

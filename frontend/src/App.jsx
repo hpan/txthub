@@ -96,6 +96,7 @@ function Pagination({ page, totalPages, onPage }) {
 const TAG_COLORS = {
   '网盘': { bg: 'bg-purple-100', text: 'text-purple-700', active: 'bg-purple-500 text-white' },
   '日记': { bg: 'bg-amber-100', text: 'text-amber-700', active: 'bg-amber-500 text-white' },
+  '代码': { bg: 'bg-emerald-100', text: 'text-emerald-700', active: 'bg-emerald-500 text-white' },
 }
 const DEFAULT_TAG_COLOR = { bg: 'bg-gray-100', text: 'text-gray-600', active: 'bg-gray-500 text-white' }
 
@@ -114,6 +115,18 @@ function LinkifyText({ text }) {
       )}
     </>
   )
+}
+
+function MessageContent({ msg }) {
+  const isCode = msg.tags && msg.tags.includes('代码')
+  if (isCode) {
+    return (
+      <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono leading-relaxed whitespace-pre-wrap break-all">
+        <code>{msg.content}</code>
+      </pre>
+    )
+  }
+  return <LinkifyText text={msg.content} />
 }
 
 function TagBadge({ name, small = false }) {
@@ -269,7 +282,7 @@ function App() {
         <form onSubmit={handleSubmit} className="mb-6 relative">
           <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="输入消息... (Enter 发送，Shift+Enter 换行)" rows={3}
-            className="w-full p-3 pb-12 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full p-3 pb-12 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
           <button type="submit"
             className="absolute right-3 bottom-3 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">发布</button>
         </form>
@@ -301,65 +314,68 @@ function App() {
         </div>
 
         <div className="space-y-3">
-          {messages.map(msg => (
-            <div key={msg.id} className={`group p-4 rounded-lg border ${msg.is_processed ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <span className="text-xs text-gray-400 font-mono shrink-0 pt-0.5">#{msg.id}</span>
-                  {editingId === msg.id ? (
-                    <div className="flex-1 flex gap-2">
-                      <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
-                        className="flex-1 p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        rows={2} autoFocus
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(msg.id) }; if (e.key === 'Escape') cancelEdit() }} />
-                      <div className="flex flex-col gap-1">
-                        <button onClick={() => saveEdit(msg.id)}
-                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">保存</button>
-                        <button onClick={cancelEdit}
-                          className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300">取消</button>
+          {messages.map(msg => {
+            const isCode = msg.tags && msg.tags.includes('代码')
+            return (
+              <div key={msg.id} className={`group p-4 rounded-lg border ${msg.is_processed ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className={`flex items-start gap-2 min-w-0 flex-1 ${isCode ? 'flex-col' : ''}`}>
+                    <span className="text-xs text-gray-400 font-mono shrink-0">#{msg.id}</span>
+                    {editingId === msg.id ? (
+                      <div className="flex-1 flex gap-2 w-full">
+                        <textarea value={editContent} onChange={e => setEditContent(e.target.value)}
+                          className="flex-1 p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                          rows={4} autoFocus
+                          onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) { saveEdit(msg.id) }; if (e.key === 'Escape') cancelEdit() }} />
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => saveEdit(msg.id)}
+                            className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">保存</button>
+                          <button onClick={cancelEdit}
+                            className="px-2 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300">取消</button>
+                        </div>
                       </div>
+                    ) : (
+                      <div className={`flex-1 ${isCode ? 'w-full' : ''}`}>
+                        <MessageContent msg={msg} />
+                        {msg.is_edited && <span className="text-xs text-gray-400 ml-1">(已编辑)</span>}
+                      </div>
+                    )}
+                  </div>
+                  {editingId !== msg.id && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => copyToClipboard(msg.content, msg.id)}
+                        title="复制"
+                        className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                          ${copiedId === msg.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}>
+                        {copiedId === msg.id ? '✓' : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        )}
+                      </button>
+                      <button onClick={() => toggleProcess(msg.id)}
+                        title={msg.is_processed ? '已处理' : '标为已处理'}
+                        className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
+                          ${msg.is_processed
+                            ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                          }`}>
+                        {msg.is_processed ? '✓' : '○'}
+                      </button>
+                      <MoreMenu onEdit={() => startEdit(msg)} onDelete={() => deleteMessage(msg.id)} />
                     </div>
-                  ) : (
-                    <span className={msg.is_processed ? 'line-through text-gray-400' : 'text-gray-800'}>
-                      <LinkifyText text={msg.content} />
-                      {msg.is_edited && <span className="ml-1.5 text-xs text-gray-400">(已编辑)</span>}
-                    </span>
                   )}
                 </div>
-                {editingId !== msg.id && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => copyToClipboard(msg.content, msg.id)}
-                      title="复制"
-                      className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
-                        ${copiedId === msg.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}>
-                      {copiedId === msg.id ? '✓' : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="9" y="9" width="13" height="13" rx="2"/>
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                      )}
-                    </button>
-                    <button onClick={() => toggleProcess(msg.id)}
-                      title={msg.is_processed ? '已处理' : '标为已处理'}
-                      className={`w-7 h-7 flex items-center justify-center rounded-full transition text-sm
-                        ${msg.is_processed
-                          ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-                        }`}>
-                      {msg.is_processed ? '✓' : '○'}
-                    </button>
-                    <MoreMenu onEdit={() => startEdit(msg)} onDelete={() => deleteMessage(msg.id)} />
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="flex gap-1.5">
+                    {msg.tags.map(t => <TagBadge key={t} name={t} small />)}
                   </div>
-                )}
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex gap-1.5">
-                  {msg.tags.map(t => <TagBadge key={t} name={t} small />)}
+                  <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
                 </div>
-                <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <Pagination page={page} totalPages={totalPages} onPage={setPage} />

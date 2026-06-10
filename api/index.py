@@ -57,11 +57,50 @@ def get_db():
 
 CLOUD_DRIVE_PATTERNS = [r'pan\.baidu\.com', r'quark\.cn', r'www\.alipan\.com', r'aliyundrive\.com', r'pan\.xunlei\.com', r'cloud\.189\.cn']
 
+CODE_PATTERNS = [
+    r'#!/',                           # shebang
+    r'^\s*(def|class|import|from)\s', # Python
+    r'^\s*(function|const|let|var|export)\s', # JS
+    r'^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER)\s', # SQL
+    r'\\\s*$',                       # shell line continuation
+    r'^\s*(echo|grep|awk|sed|curl|wget|chmod|mkdir|cd|ls|cat|pip|npm|git|docker|ssh)\s', # shell commands
+    r'^\s*\$\s',                     # shell prompt
+    r'^\s*(if|for|while|switch|try|catch)\s*[({]', # control structures
+    r'^\s*[{};]\s*$',                # code block markers
+    r'=>|->|\?\.|===|!==',           # code operators
+    r'^\s*//|^\s*#\s|^\s*/\*',    # comments
+    r'<[a-zA-Z][^>]*>',               # HTML tags
+    r'\w+\(.*\);',                  # function calls
+]
+
+def is_code(content):
+    lines = content.strip().split('\n')
+    if len(lines) >= 3:
+        score = 0
+        for line in lines:
+            for p in CODE_PATTERNS:
+                if re.search(p, line):
+                    score += 1
+                    break
+        if score >= len(lines) * 0.4:
+            return True
+    # Single line but clearly code
+    for p in [r'\\\s*$', r'#!/', r'^\s*(def|class|function|import)\s']:
+        if re.search(p, content):
+            return True
+    return False
+
 def detect_tags(content):
+    tags = []
     for p in CLOUD_DRIVE_PATTERNS:
         if re.search(p, content, re.IGNORECASE):
-            return ["网盘"]
-    return ["日记"]
+            tags.append("网盘")
+            break
+    if not tags and is_code(content):
+        tags.append("代码")
+    if not tags:
+        tags.append("日记")
+    return tags
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()

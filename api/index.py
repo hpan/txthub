@@ -84,8 +84,23 @@ def is_code(content):
                     break
         if score >= len(lines) * 0.4:
             return True
-    # Single line but clearly code
-    for p in [r'\\\s*$', r'#!/', r'^\s*(def|class|function|import)\s']:
+    single_line_patterns = [
+        r'\\\s*$',
+        r'#!/',
+        r'^\s*(def|class|function|import)\s',
+        r'\{.*\}',
+        r'\|',
+        r'>>|<<',
+        r'\$\(',
+        r'`[^`]+`',
+        r'^\s*(find|grep|awk|sed|xargs|curl|wget|rsync|scp|ssh|tar|unzip|pip|npm|yarn|cargo|go|make|cmake|docker|kubectl|terraform|ansible)\b',
+        r'^\s*(git|brew|apt|yum|dnf|pacman|snap)\b',
+        r'^\s*(python|node|ruby|perl|php|java|gcc|g\+\+|rustc)\b',
+        r'\-\w+\s+\S',
+        r'\.\/',
+        r'^\s*sudo\b',
+    ]
+    for p in single_line_patterns:
         if re.search(p, content):
             return True
     return False

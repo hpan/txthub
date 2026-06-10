@@ -104,7 +104,7 @@ function LinkifyText({ text }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g
   const parts = text.split(urlRegex)
   return (
-    <>
+    <span className="whitespace-pre-wrap">
       {parts.map((part, i) =>
         urlRegex.test(part) ? (
           <a key={i} href={part} target="_blank" rel="noopener noreferrer"
@@ -113,7 +113,7 @@ function LinkifyText({ text }) {
           <span key={i}>{part}</span>
         )
       )}
-    </>
+    </span>
   )
 }
 

@@ -1,16 +1,29 @@
-# React + Vite
+# 文枢 · 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + Tailwind CSS 构建的单页应用。
 
-Currently, two official plugins are available:
+## 开发
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev      # 启动开发服务器 (localhost:3000)
+npm run build    # 构建生产版本 → dist/
+```
 
-## React Compiler
+开发模式下 `/api` 请求自动代理到后端 `http://127.0.0.1:8000`（见 `vite.config.js`）。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 关键文件
 
-## Expanding the ESLint configuration
+| 文件 | 用途 |
+|------|------|
+| `src/App.jsx` | 全部 UI 逻辑：认证、消息列表、标签筛选、编辑、分页 |
+| `src/index.css` | Tailwind 指令入口 |
+| `public/sw.js` | Service Worker（缓存策略） |
+| `public/manifest.json` | PWA 清单 |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 技术栈
+
+- **React 19** — UI 框架
+- **Vite 5** — 构建工具
+- **Tailwind CSS 3** — 样式
+- **PWA** — Service Worker + manifest.json

@@ -1,7 +1,5 @@
-const CACHE_NAME = 'wenshu-v3'
+const CACHE_NAME = 'wenshu-v4'
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',

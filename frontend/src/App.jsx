@@ -184,6 +184,7 @@ function App() {
   const [activeTag, setActiveTag] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const fetchTags = useCallback(async () => {
     const res = await api('/api/tags')
@@ -205,13 +206,20 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!input.trim()) return
-    await api('/api/messages', { method: 'POST', body: JSON.stringify({ content: input }) })
-    setInput('')
-    setPage(1)
-    setActiveTag(null)
-    fetchMessages()
-    fetchTags()
+    if (!input.trim() || submitting) return
+    setSubmitting(true)
+    try {
+      await api('/api/messages', { method: 'POST', body: JSON.stringify({ content: input }) })
+      setInput('')
+      setPage(1)
+      setActiveTag(null)
+      fetchMessages()
+      fetchTags()
+    } catch {
+      // keep input so user can retry
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleKeyDown = (e) => {
@@ -280,11 +288,13 @@ function App() {
         </div>
 
         <form onSubmit={handleSubmit} className="mb-6 relative">
-          <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+          <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={submitting}
             placeholder="输入消息... (Enter 发送，Shift+Enter 换行)" rows={3}
-            className="w-full p-3 pb-12 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" />
-          <button type="submit"
-            className="absolute right-3 bottom-3 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">发布</button>
+            className={`w-full p-3 pb-12 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono ${submitting ? 'opacity-60' : ''}`} />
+          <button type="submit" disabled={submitting}
+            className={`absolute right-3 bottom-3 px-6 py-2 text-white rounded-lg transition
+              ${submitting ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`}>
+            {submitting ? '发布中...' : '发布'}</button>
         </form>
 
         {tags.length > 0 && (
